@@ -322,7 +322,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
   import {
-    getFirestore, doc, getDoc, setDoc, collection, addDoc, deleteDoc,
+    getFirestore, doc, getDoc, setDoc, collection, addDoc, deleteDoc, arrayUnion,
     getDocs, query, orderBy
   } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
@@ -1135,11 +1135,18 @@
     if(!state.config) return;
     var messages = ['thinking of you 💛','miss you right now','can\'t stop smiling about you','wish you were here'];
     var msg = messages[Math.floor(Math.random()*messages.length)];
-    state.pings.push({from: state.viewingAs, message: msg, ts: Date.now()});
-    if(state.pings.length>20) state.pings = state.pings.slice(-20);
+    var newPing = {from: state.viewingAs, message: msg, ts: Date.now()};
+    // Optimistic local update for instant UI feedback — the actual write
+    // below uses arrayUnion so it's correct even if this local copy is stale.
+    state.pings.push(newPing);
     renderToday();
-    var ok = await fbSetRootField('pings', state.pings);
-    toast(ok ? 'Sent 💛' : "Couldn't send (" + (lastFirebaseError || 'unknown error') + ")");
+    try{
+      await setDoc(rootRef(), {pings: arrayUnion(newPing)}, {merge:true});
+      toast('Sent 💛');
+    }catch(e){
+      noteError(e);
+      toast("Couldn't send (" + (lastFirebaseError || 'unknown error') + ")");
+    }
   }
 
   async function addMemory(){
