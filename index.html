@@ -542,12 +542,39 @@
 
   /* ---------------- helpers ---------------- */
   function pad(n){ return n<10 ? "0"+n : ""+n; }
-  function todayKey(){ var d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
-  function dayOfYear(d){ var start=new Date(d.getFullYear(),0,0); return Math.floor((d-start)/86400000); }
-  function todaysQuestion(){ return QUESTIONS[dayOfYear(new Date()) % QUESTIONS.length]; }
-  function todaysHypothetical(){ return HYPOTHETICALS[(dayOfYear(new Date())+7) % HYPOTHETICALS.length]; }
-  function todaysQuant(){ return QUANT[(dayOfYear(new Date())+3) % QUANT.length]; }
-  function todaysBuilding(){ return BUILDINGS[(dayOfYear(new Date())+15) % BUILDINGS.length]; }
+
+  // The app's "day" always rolls over at 1am Perth time, not local midnight —
+  // so wherever either of you physically are, you always see the same day,
+  // and a late night doesn't prematurely flip to tomorrow's content.
+  function perthNow(){
+    var fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Australia/Perth',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
+      hourCycle: 'h23'
+    });
+    var parts = fmt.formatToParts(new Date());
+    var obj = {};
+    parts.forEach(function(p){ if(p.type!=='literal') obj[p.type]=p.value; });
+    return {
+      year: parseInt(obj.year,10),
+      month: parseInt(obj.month,10),
+      day: parseInt(obj.day,10),
+      hour: parseInt(obj.hour,10)
+    };
+  }
+  function appEffectiveDate(){
+    var p = perthNow();
+    var d = new Date(Date.UTC(p.year, p.month-1, p.day));
+    if(p.hour < 1){ d.setUTCDate(d.getUTCDate()-1); }
+    return d;
+  }
+
+  function todayKey(){ var d=appEffectiveDate(); return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate()); }
+  function dayOfYear(d){ var start=new Date(Date.UTC(d.getUTCFullYear(),0,0)); return Math.floor((d-start)/86400000); }
+  function todaysQuestion(){ return QUESTIONS[dayOfYear(appEffectiveDate()) % QUESTIONS.length]; }
+  function todaysHypothetical(){ return HYPOTHETICALS[(dayOfYear(appEffectiveDate())+7) % HYPOTHETICALS.length]; }
+  function todaysQuant(){ return QUANT[(dayOfYear(appEffectiveDate())+3) % QUANT.length]; }
+  function todaysBuilding(){ return BUILDINGS[(dayOfYear(appEffectiveDate())+15) % BUILDINGS.length]; }
   function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
   function fmtDate(iso){
     if(!iso) return "";
@@ -562,8 +589,9 @@
     var dd=Math.floor(h/24); return dd+"d ago";
   }
   function daysUntil(iso){
-    var target=new Date(iso+"T00:00:00"), now=new Date();
-    now.setHours(0,0,0,0);
+    var parts = iso.split('-').map(Number);
+    var target = new Date(Date.UTC(parts[0], parts[1]-1, parts[2]));
+    var now = appEffectiveDate();
     return Math.round((target-now)/86400000);
   }
   function computeTogether(){
@@ -985,7 +1013,7 @@
     }
     html += '</div>';
     if(state.gallery.length){
-      var idx = dayOfYear(new Date()) % state.gallery.length;
+      var idx = dayOfYear(appEffectiveDate()) % state.gallery.length;
       html += '<div class="couple-photo" id="couplePhoto" style="background-image:url(\''+state.gallery[idx].data+'\')"></div>';
     }else{
       html += '<div class="couple-photo empty" id="couplePhoto"><span class="cp-icon">'+CAMERA_SVG+'</span></div>';
