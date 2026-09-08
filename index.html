@@ -754,7 +754,11 @@
   }
   async function fbSetDateDoc(colRef, dateKey, data){
     try{
-      await setDoc(doc(colRef, dateKey), data);
+      // merge:true so this only ever touches the fields actually passed in —
+      // callers should pass just their own name's field, never the whole
+      // local mirror of the day's doc, so a stale local copy can never
+      // clobber the other person's entry for today.
+      await setDoc(doc(colRef, dateKey), data, {merge:true});
       return true;
     }catch(e){ noteError(e); return false; }
   }
@@ -1127,7 +1131,8 @@
     var updated = Object.assign({}, existing, patch);
     state.todayCheckins[state.viewingAs] = updated;
     renderToday();
-    var ok = await fbSetDateDoc(checkinsCol(), tk, state.todayCheckins);
+    var fieldPatch = {}; fieldPatch[state.viewingAs] = updated;
+    var ok = await fbSetDateDoc(checkinsCol(), tk, fieldPatch);
     toast(ok ? 'Saved' : "Couldn't save (" + (lastFirebaseError || 'unknown error') + ")");
   }
 
@@ -1169,7 +1174,8 @@
       var tk = todayKey();
       state.todaySelfies[state.viewingAs] = dataUrl;
       renderToday();
-      var ok = await fbSetDateDoc(selfiesCol(), tk, state.todaySelfies);
+      var fieldPatch = {}; fieldPatch[state.viewingAs] = dataUrl;
+      var ok = await fbSetDateDoc(selfiesCol(), tk, fieldPatch);
       toast(ok ? 'Posted' : "Couldn't save (" + (lastFirebaseError || 'unknown error') + ")");
     }catch(e){
       toast("Couldn't add that photo");
