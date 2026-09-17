@@ -522,10 +522,11 @@
     {v:'', t:'No status set'},
     {v:'talk', t:"I'd love to talk today"},
     {v:'busy', t:'Really busy — might be slow to reply'},
-    {v:'quiet', t:'Need some quiet time today'},
-    {v:'social', t:'Feeling social — call me anytime'},
+    {v:'quiet', t:'Really hung over... urg'},
+    {v:'social', t:'Low energy :('},
     {v:'support', t:'Could use extra support today'},
     {v:'normal', t:'Just a normal day'}
+    {v:'normal', t:'I feel good, ready for a good day!!'}
   ];
 
   var TULIP_SVG = '<svg width="34" height="34" viewBox="0 0 40 40" fill="none">' +
@@ -808,6 +809,16 @@
     }catch(e){ noteError(e); }
   }
 
+  // Remembers which name this specific device last used, so each of you
+  // opens straight into your own tab instead of always defaulting to name1.
+  var VIEWER_KEY = 'sameSkyViewerName';
+  function rememberViewer(name){
+    try{ localStorage.setItem(VIEWER_KEY, name); }catch(e){ /* private browsing etc — ignore */ }
+  }
+  function recallViewer(){
+    try{ return localStorage.getItem(VIEWER_KEY); }catch(e){ return null; }
+  }
+
   async function loadAll(){
     var tk = todayKey();
     var results = await Promise.all([
@@ -828,7 +839,14 @@
     state.todayCheckins = results[5];
     state.todaySelfies = results[6];
     state.gallery = results[7];
-    if(state.config) state.viewingAs = state.config.name1;
+    if(state.config){
+      var remembered = recallViewer();
+      if(remembered === state.config.name1 || remembered === state.config.name2){
+        state.viewingAs = remembered;
+      }else{
+        state.viewingAs = state.config.name1;
+      }
+    }
   }
 
   /* ---------------- toast ---------------- */
@@ -957,8 +975,8 @@
     el.innerHTML =
       '<button class="'+(state.viewingAs===n1?'active':'')+'" id="idBtn1">'+n1+'</button>' +
       '<button class="'+(state.viewingAs===n2?'active':'')+'" id="idBtn2">'+n2+'</button>';
-    document.getElementById('idBtn1').onclick = function(){ state.viewingAs=n1; renderIdBar(); renderAll(); };
-    document.getElementById('idBtn2').onclick = function(){ state.viewingAs=n2; renderIdBar(); renderAll(); };
+    document.getElementById('idBtn1').onclick = function(){ state.viewingAs=n1; rememberViewer(n1); renderIdBar(); renderAll(); };
+    document.getElementById('idBtn2').onclick = function(){ state.viewingAs=n2; rememberViewer(n2); renderIdBar(); renderAll(); };
   }
 
   function setTab(t){
@@ -1408,6 +1426,7 @@
       if(!n1 || !n2){ toast('Both names needed'); return; }
       state.config = {name1:n1, name2:n2};
       state.viewingAs = n1;
+      rememberViewer(n1);
       ov.classList.remove('show');
       renderIdBar(); renderAll();
       var ok = await fbSetRootField('config', state.config);
